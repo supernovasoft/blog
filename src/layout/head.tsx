@@ -1,8 +1,11 @@
 import React from 'react';
 import { HeadProvider, Title } from 'react-head'; // , Link, Meta
-import PropTypes from 'prop-types';
 
-class Head extends React.Component {
+type HeadProps = {
+    title?: string;
+};
+
+class Head extends React.Component<HeadProps> {
     render() {
         const { title } = this.props;
         return (
@@ -10,12 +13,8 @@ class Head extends React.Component {
                 <meta charSet="UTF-8" />
                 <Title>{!!title && title}</Title>
             </HeadProvider>
-        )
+        );
     }
-}
-
-Head.propTypes = {
-    title: PropTypes.string,
 }
 
 export default Head;

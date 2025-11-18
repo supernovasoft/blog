@@ -1,350 +1,753 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { connect } from 'react-redux';
-import { Button, Label, Divider, Modal, Icon, Header, Form, Message, Table, Dropdown } from 'semantic-ui-react';
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
-//import _ from 'lodash';
 
 import { LayoutUser, MainMenu, SimplePaginate, slugify, fromObjectToList, randomString, DisplayTimeAgo } from '../../layout';
 import { db } from '../../firebase';
 
 const treeName = "articles";
 const treeName2 = "categories";
-const INITIAL_STATE = {title: '', desc: '', error: '', success: '', loading: false}
+const INITIAL_STATE = { title: '', desc: '', error: '', success: '', loading: false, categoryId: null };
 
-class AddDataModal extends React.Component {
-    state = {open: false, ...INITIAL_STATE, categories: [], categoryId: null}
-    closeConfigShow = (closeOnEscape) => () => {this.setState({closeOnEscape, open: true})}
-    close = () => this.setState({open: false})
-    handleSubmit = async (e) => {
+const AddDataModal = ({ getDatalistRefresh, displayName, uid }) => {
+    const [state, setState] = useState({ open: false, ...INITIAL_STATE, categories: [] });
+    
+    const openModal = () => setState({ open: true, ...INITIAL_STATE, categories: [] });
+    const closeModal = () => setState({ open: false, error: '', success: '' });
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        this.setState({loading: true, error: '', success: ''})
-        const articleId = randomString(28);
-        db.ref(treeName).child(articleId).set({
-            title: this.state.title,
-            slug: slugify(this.state.title),
-            author: this.props.displayName || 'Admin',
-            uid: this.props.uid || 'xxx',
-            articleId: articleId,
-            categoryId: this.state.categoryId,
-            desc: this.state.desc,
-            date: Math.floor(Date.now()),
-        })
-        this.setState({title: '', desc: '', loading: false, open: false});
-        this.props.getDatalistRefresh();
-    }
-    handleInput = async e => {
-        const search = e.target.value;
-        let categories = []
-        if (!!search && search.length > 1) {
-            let qref = db.ref(treeName2)
-            qref = qref.orderByChild("slug").startAt(search).endAt(search+"\uf8ff")
-            const snapshot = await qref.once('value');
-            const options = fromObjectToList(snapshot.val());
-            categories = options.map((val, key) => ({key, value: val.categoryId, text: val.name}))
+        setState(prev => ({ ...prev, loading: true, error: '', success: '' }));
+        
+        try {
+            const articleId = randomString(28);
+            await db.ref(treeName).child(articleId).set({
+                title: state.title,
+                slug: slugify(state.title),
+                author: displayName || 'Admin',
+                uid: uid || 'xxx',
+                articleId: articleId,
+                categoryId: state.categoryId,
+                desc: state.desc,
+                date: Math.floor(Date.now()),
+            });
+            
+            setState({ title: '', desc: '', categoryId: null, loading: false, success: 'Article added successfully!' });
+            setTimeout(() => {
+                closeModal();
+                getDatalistRefresh();
+            }, 1000);
+        } catch (error) {
+            setState(prev => ({ ...prev, loading: false, error: error.message || 'Failed to add article' }));
         }
-        this.setState({categories})
-    }
-    render = () => {
-        const { open, closeOnEscape, title, desc } = this.state;
-        const isValid = title !== '' && desc !== '';
-        return (
-            <React.Fragment>
-                <Button floated='right' size="mini" color='orange' onClick={this.closeConfigShow(false, true)}><Icon name='plus' />New Article</Button>
-                <Modal closeOnEscape={closeOnEscape} onClose={this.close} open={open} size='large'>
-                    <Modal.Header>Add New Article</Modal.Header>
-                    <Modal.Content>
-                        <Modal.Description>
-                            <Form onSubmit={this.handleSubmit} error={!!this.state.error}>
-                                {!!this.state.error && <Message error visible header="Error!" content={this.state.error} />}
-                                {!!this.state.success && <Message error visible header="Success!" content={this.state.success} />}
-                                <Form.Field>
-                                    <label>Title</label>
-                                    <input 
-                                        type="text"
-                                        value={title}
-                                        onChange={e => this.setState({title: e.target.value})}
-                                        placeholder="Title"
-                                    />
-                                </Form.Field>
-                                <Form.Field>
-                                    <label>Category</label>
-                                    <Dropdown 
-                                        placeholder="Select Category"
-                                        fluid
-                                        search
-                                        selection
-                                        onInput={this.handleInput}
-                                        onChange={(e, { value }) => this.setState({ categoryId: value })}
-                                        options={this.state.categories}
-                                    />
-                                </Form.Field>
-                                <Form.Field>
-                                    <SimpleMDE
-                                        id="addnewarticledesc"
-                                        label="Description"
-                                        onChange={value => this.setState({desc: value})}
-                                        value={desc}
-                                        options={{
-                                            autofocus: false,
-                                            spellChecker: true,
-                                        }}
-                                    />
-                                </Form.Field>
-                                <Button loading={this.state.loading} disabled={!isValid} primary>Save</Button>
-                            </Form>
-                        </Modal.Description>
-                    </Modal.Content>
-                </Modal>
-            </React.Fragment>
-        )
-    }
-}
+    };
 
-class EditDataModal extends React.Component {
-    constructor(props){
-        super(props)
-        this.state = {open: false, loading: false, error: '', success: '', ...props.dataRow}
-    }
-    closeConfigShow = (closeOnEscape) => () => {this.setState({closeOnEscape, open: true})}
-    close = () => this.setState({open: false})
-    handleSubmit = async (e) => {
-        e.preventDefault()
-        this.setState({loading: true, error: '', success: ''})
-        const { articleId } = this.state;
-        db.ref(treeName).child(articleId).update({
-            title: this.state.title,
-            slug: slugify(this.state.title),
-            author: this.state.displayName || 'Admin',
-            uid: this.state.uid || 'xxx',
-            articleId: articleId,
-            desc: this.state.desc,
-            date: Math.floor(Date.now()),
-        })
-        this.setState({loading: false, open: false})
-        this.props.getDatalistRefresh();
-    }
-    handleInput = async e => {
-        const search = e.target.value;
-        let categories = []
-        if (!!search && search.length > 1) {
-            let qref = db.ref(treeName2)
-            qref = qref.orderByChild("slug").startAt(search).endAt(search+"\uf8ff")
-            const snapshot = await qref.once('value');
-            const options = fromObjectToList(snapshot.val());
-            categories = options.map((val, key) => ({key, value: val.categoryId, text: val.name}))
-        }
-        this.setState({categories})
-    }
-    componentDidMount(){
-        this.handleInput({target:{value: this.state.categoryId}})
-    }
-    render = () => {
-        const { title, desc} = this.state
-        const isValid = title !== '' && desc !== ''
-        return (
-            <React.Fragment>
-                <span onClick={this.closeConfigShow(false, true)} style={{ cursor: 'pointer' }}><Icon name="edit outline" color="blue" /></span>
-                <Modal closeOnEscape={this.state.closeOnEscape} onClose={this.close} open={this.state.open} size='large'>
-                    <Modal.Header>Edit Article</Modal.Header>
-                    <Modal.Content>
-                        <Modal.Description>
-                            <Form onSubmit={this.handleSubmit} error={!!this.state.error}>
-                                {!!this.state.error && <Message error visible header="Error!" content={this.state.error} />}
-                                {!!this.state.success && <Message error visible header="Success!" content={this.state.success} />}
-                                <Form.Field>
-                                    <label>Title</label>
-                                    <input 
-                                        type="text"
-                                        value={title}
-                                        onChange={e => this.setState({title: e.target.value})}
-                                        placeholder="Title"
-                                    />
-                                </Form.Field>
-                                <Form.Field>
-                                    <label>Category</label>
-                                    <Dropdown 
-                                        placeholder="Select Category"
-                                        fluid
-                                        search
-                                        selection
-                                        onInput={this.handleInput}
-                                        onChange={(e, { value }) => this.setState({ categoryId: value })}
-                                        options={this.state.categories}
-                                        value={this.state.categoryId}
-                                    />
-                                </Form.Field>
-                                <Form.Field>
-                                    <SimpleMDE
-                                        id="editarticledesc"
-                                        label="Description"
-                                        onChange={value => this.setState({desc: value})}
-                                        value={desc}
-                                        options={{
-                                            autofocus: false,
-                                            spellChecker: true,
-                                        }}
-                                    />
-                                </Form.Field>
-                                <Button loading={this.state.loading} disabled={!isValid} primary>Save</Button>
-                            </Form>
-                        </Modal.Description>
-                    </Modal.Content>
-                </Modal>
-            </React.Fragment>
-        )
-    }
-}
-
-class DataRow extends React.Component {
-    state = {open: false}
-    closeConfigShow = (closeOnEscape) => () => {this.setState({closeOnEscape, open: true})}
-    close = () => this.setState({open: false})
-    handleDelete = async articleId => {
-        await db.ref(treeName).child(articleId).remove();
-        this.props.getDatalistRefresh();
-    }
-    deleteModal = articleId => {
-        const { open, closeOnEscape } = this.state;
-        return (
-            <React.Fragment>
-                <span onClick={this.closeConfigShow(false, true)} style={{ cursor: 'pointer' }}><Icon name='trash alternate outline' color='red' /></span>
-                <Modal closeOnEscape={closeOnEscape} onClose={this.close} open={open} basic size='tiny'>
-					<Header icon='trash alternate outline' content="Delete Article" />
-					<Modal.Content>
-						<p>Are you sure to delete this article?</p>
-					</Modal.Content>
-					<Modal.Actions>
-						<Button color='green' onClick={() => this.handleDelete(articleId)} inverted><Icon name='checkmark' /> Yes</Button>
-						<Button basic color='red' onClick={this.close} inverted><Icon name='remove' /> No</Button>
-					</Modal.Actions>
-				</Modal>
-            </React.Fragment>
-        )
-    }
-    render = () => {
-        const { Row, Cell } = Table;
-        const { title, articleId, date } = this.props.dataRow;
-        return (
-            <Row>
-                <Cell>{title}</Cell>
-                <Cell>{articleId}</Cell>
-                <Cell><DisplayTimeAgo time={date} isTimeAgo={true} /></Cell>
-                <Cell>
-                    <EditDataModal {...this.props} />
-                    {this.deleteModal(articleId)}
-                </Cell>
-            </Row>
-        )
-    }
-}
-
-class Articles extends React.Component {
-    constructor(props){
-        super(props);
-        this._isMounted = false;
-        this.state = {
-            currentPage: 1,
-            perPage: 20,
-            totalItemCount: 1,
-            datalistStack:[],
-            datalist: [],
-            searchFilter: "",
-        }
-    }
-    getDatalistCount = async () => await db.ref(treeName).once("value", snapshot => this.setState({totalItemCount: snapshot.numChildren()}))
-    getDatalist = async (queryDict={}) => {
-        const { currentPage, perPage, datalistStack } = this.state;
-        const startAt = currentPage * perPage - perPage;
-        const direction = queryDict.hasOwnProperty("direction")?queryDict.direction: 'next';
-        const searchFilter = queryDict.hasOwnProperty("searchFilter")?queryDict.searchFilter:'';
-        let qref = db.ref(treeName)
-        let datalist;
-        if (direction === 'next') {
-            if (startAt > 0) {
-                const lastObj = this.state.datalist[this.state.datalist.length - 1];
-                qref = qref.startAt(lastObj.articleId);
-            }
-            if (datalistStack.hasOwnProperty(this.currentPage)) {
-                datalist = datalistStack[currentPage - 1];
+    const handleInput = async (e) => {
+        const search = e.target.value || '';
+        let categories = [];
+        
+        try {
+            let qref = db.ref(treeName2);
+            if (search.length > 0) {
+                qref = qref.orderByChild("name").startAt(search).endAt(search + "\uf8ff");
             } else {
-                qref = qref.orderByKey().limitToFirst(perPage + 1);
-                const snapshot = await qref.once("value")
-                datalist = fromObjectToList(snapshot.val())
-                datalistStack.push(datalist);
+                qref = qref.orderByChild("name").limitToFirst(10);
             }
-        } else if (direction === 'prev') {
-            datalist = datalistStack[currentPage - 1]
+            const snapshot = await qref.once('value');
+            const options = fromObjectToList(snapshot.val());
+            categories = options.map((val, key) => ({ key, value: val.categoryId, text: val.name }));
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
         }
-        if (datalist === null) {datalist = []}
-        this.setState({datalist, searchFilter});
-    }
-    getDatalistRefresh = () => {
-        this._isMounted && this.setState({datalistStack: []}, async () => {
-            await this.getDatalistCount();
-            await this.getDatalist();
-        })
-    }
-    getDatalistPartial(){
-        let { datalist, perPage } = this.state;
-        if (datalist.length === perPage + 1) {datalist = datalist.slice(0, -1)}
-        return datalist;
-    }
-    handlePageClick = direction => {
-        const nextPage = direction === 'next' ? this.state.currentPage + 1 : this.state.currentPage - 1;
-        this.setState({currentPage: nextPage}, async () => {
-            await this.getDatalist({direction});
+        
+        setState(prev => ({ ...prev, categories }));
+    };
+    
+    useEffect(() => {
+        handleInput({ target: { value: '' } });
+    }, []);
+
+    const { open, title, desc, loading, error, success, categories, categoryId } = state;
+    const isValid = title.trim() !== '' && desc.trim() !== '';
+    
+    return (
+        <>
+            <button 
+                className="btn btn-primary text-sm px-4 py-2 flex items-center"
+                onClick={openModal}
+            >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Article
+            </button>
+            
+            {open && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={loading ? undefined : closeModal} />
+                        
+                        <div className="inline-block w-full max-w-3xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
+                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                <div className="flex items-center">
+                                    <svg className="w-6 h-6 mr-3 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                        Add New Article
+                                    </h3>
+                                </div>
+                            </div>
+                            
+                            <form onSubmit={handleSubmit} className="px-6 py-4">
+                                {error && (
+                                    <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                                    </div>
+                                )}
+                                {success && (
+                                    <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                        <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+                                    </div>
+                                )}
+                                
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Article Title
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="input"
+                                            placeholder="Enter a compelling title for your article"
+                                            value={title}
+                                            onChange={(e) => setState(prev => ({ ...prev, title: e.target.value }))}
+                                            required
+                                            autoFocus
+                                            disabled={loading}
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Category
+                                        </label>
+                                        <select
+                                            className="input"
+                                            value={categoryId || ''}
+                                            onChange={(e) => setState(prev => ({ ...prev, categoryId: e.target.value || null }))}
+                                            disabled={loading}
+                                        >
+                                            <option value="">Select a category</option>
+                                            {categories.map(cat => (
+                                                <option key={cat.value} value={cat.value}>{cat.text}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Content (Markdown)
+                                        </label>
+                                        <SimpleMDE
+                                            id="addnewarticledesc"
+                                            onChange={(value) => setState(prev => ({ ...prev, desc: value }))}
+                                            value={desc}
+                                            options={{
+                                                autofocus: false,
+                                                spellChecker: true,
+                                                placeholder: 'Write your article content in Markdown...',
+                                                status: false,
+                                                toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'code', 'unordered-list', 'ordered-list', '|', 'link', 'image', '|', 'preview', 'guide'],
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="flex justify-end mt-8 space-x-3">
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary"
+                                        onClick={closeModal} 
+                                        disabled={loading}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        className="btn btn-primary"
+                                        disabled={!isValid || loading}
+                                    >
+                                        {loading ? (
+                                            <span className="flex items-center">
+                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Publishing...
+                                            </span>
+                                        ) : (
+                                            <span className="flex items-center">
+                                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Publish
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+
+const EditDataModal = ({ dataRow, getDatalistRefresh }) => {
+    const [state, setState] = useState({
+        open: false,
+        loading: false,
+        error: '',
+        success: '',
+        title: dataRow.title || '',
+        desc: dataRow.desc || '',
+        categoryId: dataRow.categoryId || null,
+        articleId: dataRow.articleId || '',
+        categories: [],
+    });
+    
+    useEffect(() => {
+        setState(prev => ({ 
+            ...prev,
+            title: dataRow.title,
+            desc: dataRow.desc,
+            categoryId: dataRow.categoryId,
+        }));
+    }, [dataRow]);
+    
+    const openModal = () => {
+        setState({ 
+            ...state,
+            open: true,
+            title: dataRow.title,
+            desc: dataRow.desc,
+            categoryId: dataRow.categoryId,
+            error: '', 
+            success: '' 
         });
-    }
-    componentWillUnmount(){this._isMounted = false;}
-    componentDidMount(){
-        this._isMounted = true; this.getDatalistRefresh();
-    }
-    render = () => {
-        const { Header, Row, HeaderCell, Body } = Table;
-        const datalist = this.getDatalistPartial();
-        return (
-            <LayoutUser>
-                <MainMenu history={this.props.history} />
-                <h3>All Articles <Label floated="right">Total {this.state.totalItemCount}</Label>
-                    <AddDataModal getDatalistRefresh={this.getDatalistRefresh} uid={this.props.uid} displayName={this.props.displayName} />
-                </h3>
-                <Divider />
-                <Table>
-                    <Header>
-                        <Row>
-                            <HeaderCell>Title</HeaderCell>
-                            <HeaderCell>ID</HeaderCell>
-                            <HeaderCell>Time</HeaderCell>
-                            <HeaderCell><Icon name='ellipsis horizontal' /></HeaderCell>
-                        </Row>
-                    </Header>
-                    <Body>
-                        {datalist.length > 0 && datalist.map((dataRow, key) => 
-                            <DataRow key={key} getDatalistRefresh={this.getDatalistRefresh} dataRow={dataRow} />
+        handleInput({ target: { value: '' } });
+    };
+    
+    const closeModal = () => setState(prev => ({ ...prev, open: false, error: '', success: '' }));
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setState(prev => ({ ...prev, loading: true, error: '', success: '' }));
+        
+        try {
+            const { articleId, title, desc, categoryId } = state;
+            await db.ref(treeName).child(articleId).update({
+                title: title,
+                slug: slugify(title),
+                desc: desc,
+                categoryId: categoryId,
+                dateModified: Math.floor(Date.now()),
+            });
+            
+            setState(prev => ({ ...prev, loading: false, success: 'Article updated successfully!' }));
+            setTimeout(() => {
+                closeModal();
+                getDatalistRefresh();
+            }, 1000);
+        } catch (error) {
+            setState(prev => ({ ...prev, loading: false, error: error.message || 'Failed to update article' }));
+        }
+    };
+
+    const handleInput = async (e) => {
+        const search = e.target.value || '';
+        let categories = [];
+        
+        try {
+            let qref = db.ref(treeName2);
+            if (search.length > 0) {
+                qref = qref.orderByChild("name").startAt(search).endAt(search + "\uf8ff");
+            } else {
+                qref = qref.orderByChild("name").limitToFirst(10);
+            }
+            const snapshot = await qref.once('value');
+            const options = fromObjectToList(snapshot.val());
+            categories = options.map((val, key) => ({ key, value: val.categoryId, text: val.name }));
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
+        }
+        
+        setState(prev => ({ ...prev, categories }));
+    };
+
+    const { title, desc, loading, error, success, open, categories, categoryId } = state;
+    const isValid = title.trim() !== '' && desc.trim() !== '';
+    
+    return (
+        <>
+            <button 
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 p-1"
+                onClick={openModal}
+                title="Edit article"
+            >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+            </button>
+            
+            {open && (
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={loading ? undefined : closeModal} />
+                        
+                        <div className="inline-block w-full max-w-3xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
+                            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                                <div className="flex items-center">
+                                    <svg className="w-6 h-6 mr-3 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                        Edit Article
+                                    </h3>
+                                </div>
+                            </div>
+                            
+                            <form onSubmit={handleSubmit} className="px-6 py-4">
+                                {error && (
+                                    <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                                    </div>
+                                )}
+                                {success && (
+                                    <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                        <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+                                    </div>
+                                )}
+                                
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Article Title
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="input"
+                                            placeholder="Article title"
+                                            value={title}
+                                            onChange={(e) => setState(prev => ({ ...prev, title: e.target.value }))}
+                                            required
+                                            autoFocus
+                                            disabled={loading}
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Category
+                                        </label>
+                                        <select
+                                            className="input"
+                                            value={categoryId || ''}
+                                            onChange={(e) => setState(prev => ({ ...prev, categoryId: e.target.value || null }))}
+                                            disabled={loading}
+                                        >
+                                            <option value="">Select a category</option>
+                                            {categories.map(cat => (
+                                                <option key={cat.value} value={cat.value}>{cat.text}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Content (Markdown)
+                                        </label>
+                                        <SimpleMDE
+                                            id="editarticledesc"
+                                            onChange={(value) => setState(prev => ({ ...prev, desc: value }))}
+                                            value={desc}
+                                            options={{
+                                                autofocus: false,
+                                                spellChecker: true,
+                                                status: false,
+                                                toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'code', 'unordered-list', 'ordered-list', '|', 'link', 'image', '|', 'preview', 'guide'],
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="flex justify-end mt-8 space-x-3">
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary"
+                                        onClick={closeModal} 
+                                        disabled={loading}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        className="btn btn-primary"
+                                        disabled={!isValid || loading}
+                                    >
+                                        {loading ? (
+                                            <span className="flex items-center">
+                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Updating...
+                                            </span>
+                                        ) : (
+                                            <span className="flex items-center">
+                                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                                Update
+                                            </span>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+
+const DataRow = ({ dataRow, getDatalistRefresh }) => {
+    const [open, setOpen] = useState(false);
+    
+    const openDeleteModal = () => setOpen(true);
+    const closeDeleteModal = () => setOpen(false);
+
+    const handleDelete = async (articleId) => {
+        try {
+            await db.ref(treeName).child(articleId).remove();
+            closeDeleteModal();
+            getDatalistRefresh();
+        } catch (error) {
+            console.error('Failed to delete article:', error);
+            alert('Failed to delete article: ' + error.message);
+        }
+    };
+
+    const { title, articleId, slug, date, author } = dataRow;
+    
+    return (
+        <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            <td className="px-6 py-4">
+                <div className="flex items-center">
+                    <svg className="w-5 h-5 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {title}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            {slug}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    {author || 'Admin'}
+                </span>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                <DisplayTimeAgo time={date} isTimeAgo={true} />
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-center">
+                <div className="flex items-center justify-center space-x-2">
+                    <EditDataModal dataRow={dataRow} getDatalistRefresh={getDatalistRefresh} />
+                    <button 
+                        className="text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 p-1"
+                        onClick={openDeleteModal}
+                        title="Delete article"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+                
+                {open && (
+                    <div className="fixed inset-0 z-50 overflow-y-auto">
+                        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                            <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={closeDeleteModal} />
+                            
+                            <div className="inline-block w-full max-w-md my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-lg">
+                                <div className="px-6 py-4">
+                                    <div className="flex items-center">
+                                        <svg className="w-6 h-6 mr-3 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                            Delete Article
+                                        </h3>
+                                    </div>
+                                </div>
+                                <div className="px-6 py-4">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Are you sure you want to delete this article? This action cannot be undone.
+                                    </p>
+                                </div>
+                                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 flex justify-end space-x-3">
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary"
+                                        onClick={closeDeleteModal}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        className="btn btn-danger"
+                                        onClick={() => handleDelete(articleId)}
+                                    >
+                                        <span className="flex items-center">
+                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            Delete
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </td>
+        </tr>
+    );
+};
+
+const Articles = ({ displayName, uid }) => {
+    const [state, setState] = useState({
+        currentPage: 1,
+        perPage: 20,
+        totalItemCount: 1,
+        datalistStack: [],
+        datalist: [],
+        searchFilter: "",
+        loading: true,
+    });
+    
+    const getDatalistCount = useCallback(async () => {
+        try {
+            const snapshot = await db.ref(treeName).once("value");
+            setState(prev => ({ ...prev, totalItemCount: snapshot.numChildren() }));
+        } catch (error) {
+            console.error('Error getting article count:', error);
+        }
+    }, []);
+    
+    const getDatalist = useCallback(async (queryDict = {}) => {
+        try {
+            const { currentPage, perPage, datalistStack } = state;
+            const startAt = currentPage * perPage - perPage;
+            const direction = queryDict.direction || 'next';
+            const searchFilter = queryDict.searchFilter || '';
+            
+            let qref = db.ref(treeName);
+            let datalist;
+            
+            if (direction === 'next') {
+                if (startAt > 0) {
+                    const lastObj = state.datalist[state.datalist.length - 1];
+                    qref = qref.startAt(lastObj.articleId);
+                }
+                if (datalistStack[currentPage - 1]) {
+                    datalist = datalistStack[currentPage - 1];
+                } else {
+                    qref = qref.orderByKey().limitToFirst(perPage + 1);
+                    const snapshot = await qref.once("value");
+                    datalist = fromObjectToList(snapshot.val());
+                    setState(prev => ({ 
+                        ...prev, 
+                        datalistStack: [...prev.datalistStack, datalist] 
+                    }));
+                }
+            } else if (direction === 'prev') {
+                datalist = datalistStack[currentPage - 1];
+            }
+            
+            if (datalist === null) datalist = [];
+            setState(prev => ({ ...prev, datalist, searchFilter, loading: false }));
+        } catch (error) {
+            console.error('Error getting articles:', error);
+            setState(prev => ({ ...prev, loading: false }));
+        }
+    }, [state.currentPage, state.perPage, state.datalist, state.datalistStack, setState]);
+    
+    const getDatalistRefresh = useCallback(() => {
+        setState(prev => ({ ...prev, datalistStack: [], loading: true }));
+    }, [setState]);
+    
+    useEffect(() => {
+        if (state.loading) {
+            const fetchData = async () => {
+                await getDatalistCount();
+                await getDatalist();
+            };
+            fetchData();
+        }
+    }, [state.loading, getDatalistCount, getDatalist]);
+    
+    const getDatalistPartial = useCallback(() => {
+        const { datalist, perPage } = state;
+        if (datalist.length === perPage + 1) {
+            return datalist.slice(0, -1);
+        }
+        return datalist;
+    }, [state.datalist, state.perPage]);
+    
+    const handlePageClick = useCallback((direction) => {
+        const nextPage = direction === 'next' ? state.currentPage + 1 : state.currentPage - 1;
+        setState(prev => ({ ...prev, currentPage: nextPage }));
+    }, [state.currentPage, setState]);
+    
+    useEffect(() => {
+        getDatalistRefresh();
+    }, [getDatalistRefresh]);
+    
+    const datalist = getDatalistPartial();
+    const { totalItemCount, currentPage, perPage, loading } = state;
+    
+    return (
+        <LayoutUser>
+            <MainMenu />
+            
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="card">
+                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <svg className="w-6 h-6 mr-3 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <div>
+                                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                                        Articles
+                                    </h2>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Create and manage your technical blog posts
+                                    </p>
+                                </div>
+                            </div>
+                            <AddDataModal 
+                                getDatalistRefresh={getDatalistRefresh} 
+                                uid={uid} 
+                                displayName={displayName} 
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="px-6 py-4">
+                        <div className="flex items-center mb-6">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                </svg>
+                                Total: {totalItemCount}
+                            </span>
+                        </div>
+                        
+                        {loading ? (
+                            <div className="flex justify-center py-12">
+                                <svg className="animate-spin w-8 h-8 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
+                        ) : (
+                            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                                <table className="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
+                                    <thead className="bg-gray-50 dark:bg-gray-800">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                Article
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                Author
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                Created
+                                            </th>
+                                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                                Actions
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                                        {datalist.length > 0 ? (
+                                            datalist.map((dataRow, key) => (
+                                                <DataRow 
+                                                    key={dataRow.articleId || key} 
+                                                    getDatalistRefresh={getDatalistRefresh} 
+                                                    dataRow={dataRow} 
+                                                />
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="4" className="px-6 py-12 text-center">
+                                                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">No articles found</h3>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Create your first article to get started</p>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
-                    </Body>
-                </Table>
-                <SimplePaginate 
-                    page={this.state.currentPage}
-                    totalPages={Math.ceil(this.state.totalItemCount / this.state.perPage)}
-                    handlePageClick={this.handlePageClick}
-                />
-            </LayoutUser>
-        )
-    }
-}
+                        
+                        {totalItemCount > perPage && (
+                            <div className="mt-6 flex justify-center">
+                                <SimplePaginate 
+                                    page={currentPage}
+                                    totalPages={Math.ceil(totalItemCount / perPage)}
+                                    handlePageClick={handlePageClick}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </LayoutUser>
+    );
+};
 
 const mapStateToProps = state => {
-    const { authUser } = state.sessionState
-    //console.log(authUser)
+    const { authUser } = state.sessionState;
     return {
         isAuthenticated: !!authUser,
         token: !!authUser && authUser.uid,
+        uid: !!authUser && authUser.uid,
         displayName: !!authUser && authUser.displayName,
         email: !!authUser && authUser.email,
         emailVerified: !!authUser && authUser.emailVerified,
-    }
-}
+    };
+};
 
 export default connect(mapStateToProps, null)(Articles);

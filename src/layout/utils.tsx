@@ -29,22 +29,30 @@ export const randomString = (len, charSet) => {
     return randomString;
 }
 
-export class DisplayTimeAgo extends React.Component {
-    constructor(props){
-        super(props)
-        const time = !!this.props.time && new Intl.DateTimeFormat('en-US', 
-                  {year: 'numeric', month: '2-digit',day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'}).format(this.props.time)
-        this.state = {
-            currentLang: 'en',
-            time: time,
-        }
+const formatter = buildFormatter(englishStrings);
+
+type DisplayTimeAgoProps = {
+    time?: number;
+    isTimeAgo?: boolean;
+};
+
+export const DisplayTimeAgo: React.FC<DisplayTimeAgoProps> = ({ time, isTimeAgo }) => {
+    if (!time) {
+        return null;
     }
-    
-    render = () => {
-        return (
-            (!!this.props.isTimeAgo) ?
-                <TimeAgo date={this.state.time} title={this.state.time} formatter={buildFormatter(englishStrings)} />
-            : this.state.time
-        )
+
+    const formatted = new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    }).format(time);
+
+    if (isTimeAgo) {
+        return <TimeAgo date={formatted} title={formatted} formatter={formatter} />;
     }
-}
+
+    return <>{formatted}</>;
+};

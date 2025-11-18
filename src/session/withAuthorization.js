@@ -1,27 +1,26 @@
 import React from 'react';
-import { withRouter } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { firebase } from '../firebase';
 import { LOGIN_ROUTE } from '../settings';
 
 const withAuthorization = (needsAuthorization) => (Component) => {
-    class WithAuthorization extends React.Component {
-        // constructor(props){
-        //     super(props);
-        // }
-        componentDidMount() {
-            const { history } = this.props;
-            firebase.auth.onAuthStateChanged(authUser => {
+    const WithAuthorization = (props) => {
+        const navigate = useNavigate();
+        
+        React.useEffect(() => {
+            const unsubscribe = firebase.auth.onAuthStateChanged(authUser => {
                 if(!authUser && needsAuthorization) {
-                    history.push(LOGIN_ROUTE);
+                    navigate(LOGIN_ROUTE);
                 }
             });
-        }
-        render = () => (
-            <Component {...this.props} />
-        )
-    }
-    return withRouter(WithAuthorization);
+            return unsubscribe;
+        }, [navigate]);
+
+        return <Component {...props} />;
+    };
+    
+    return WithAuthorization;
 }
 
 export default withAuthorization;

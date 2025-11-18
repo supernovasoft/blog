@@ -1,9 +1,15 @@
 import React, { Component } from 'react';
 import { Button } from 'semantic-ui-react';
-import PropTypes from 'prop-types';
 
+type Direction = 'next' | 'prev';
 
-class SimplePaginate extends Component {
+interface SimplePaginateProps {
+    totalPages: number;
+    page: number;
+    handlePageClick: (direction: Direction) => void;
+}
+
+class SimplePaginate extends Component<SimplePaginateProps> {
     render() {
         const { totalPages, page, handlePageClick } = this.props;
         return (
@@ -22,13 +28,8 @@ class SimplePaginate extends Component {
                     onClick={() => handlePageClick('next')}
                     >&rarr;</Button>
             </div>
-        )
+        );
     }
-}
-SimplePaginate.propTypes = {
-    totalPages: PropTypes.number.isRequired,
-    page: PropTypes.number.isRequired,
-    handlePageClick: PropTypes.func.isRequired,
 }
 
 export default SimplePaginate;
