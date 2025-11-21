@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { LayoutUser, MainMenu, SimplePaginate, slugify, fromObjectToList, randomString, DisplayTimeAgo } from '../../layout';
 import { db } from '../../firebase';
 
@@ -452,7 +452,7 @@ const Categories = () => {
             console.error('Error getting categories:', error);
             setState(prev => ({ ...prev, loading: false }));
         }
-    }, [state.currentPage, state.perPage, state.datalist, state.datalistStack, setState]);
+    }, [state.currentPage, state.perPage, state.datalist, state.datalistStack, setState]); // eslint-disable-line react-hooks/exhaustive-deps
     
     const getDatalistRefresh = useCallback(() => {
         setState(prev => ({ ...prev, datalistStack: [], loading: true }));
@@ -474,7 +474,7 @@ const Categories = () => {
             return datalist.slice(0, -1);
         }
         return datalist;
-    }, [state.datalist, state.perPage]);
+    }, [state.datalist, state.perPage]); // eslint-disable-line react-hooks/exhaustive-deps
     
     const handlePageClick = useCallback((direction) => {
         const nextPage = direction === 'next' ? state.currentPage + 1 : state.currentPage - 1;

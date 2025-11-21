@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Remarkable } from 'remarkable';
 import hljs from 'highlight.js';
 
 import { db } from '../../../firebase';
 import { LayoutGuest, PublicMenu, fromObjectToList, DisplayTimeAgo } from '../../../layout';
-import CopyButton from '../../../components/CopyButton';
 
 const treeName = "articles";
 

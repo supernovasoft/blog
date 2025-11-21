@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGuest } from '../../layout';
 import { auth, fs } from '../../firebase';
@@ -9,7 +9,6 @@ const INITIAL_STATE = { email: "", password: "", loading: false, error: null };
 const Login = () => {
     const navigate = useNavigate();
     const [state, setState] = useState(INITIAL_STATE);
-    const abortController = new AbortController();
 
     const handleSubmit = async e => {
         const { email, password } = state;

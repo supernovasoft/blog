@@ -3,7 +3,6 @@ import { connect } from 'react-redux';
 import { Button, Label, Divider, Modal, Icon, Header, Form, Message, Table, Dropdown } from 'semantic-ui-react';
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
-//import _ from 'lodash';
 
 import { LayoutUser, MainMenu, SimplePaginate, slugify, fromObjectToList, randomString, DisplayTimeAgo } from '../../layout';
 import { db } from '../../firebase';

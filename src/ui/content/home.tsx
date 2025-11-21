@@ -182,7 +182,7 @@ const Home = () => {
         const { filteredDatalist, perPage, currentPage } = state;
         const startIndex = (currentPage - 1) * perPage;
         return filteredDatalist.slice(startIndex, startIndex + perPage);
-    }, [state.filteredDatalist, state.perPage, state.currentPage]);
+    }, [state.filteredDatalist, state.perPage, state.currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleCategoryFilter = useCallback((category: string) => {
         console.log('Filter called with category:', category);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { connect } from 'react-redux';
 import SimpleMDE from "react-simplemde-editor";
 import "easymde/dist/easymde.min.css";
@@ -596,7 +596,7 @@ const Articles = ({ displayName, uid }) => {
             console.error('Error getting articles:', error);
             setState(prev => ({ ...prev, loading: false }));
         }
-    }, [state.currentPage, state.perPage, state.datalist, state.datalistStack, setState]);
+    }, [state.currentPage, state.perPage, state.datalist, state.datalistStack, setState]); // eslint-disable-line react-hooks/exhaustive-deps
     
     const getDatalistRefresh = useCallback(() => {
         setState(prev => ({ ...prev, datalistStack: [], loading: true }));
@@ -618,7 +618,7 @@ const Articles = ({ displayName, uid }) => {
             return datalist.slice(0, -1);
         }
         return datalist;
-    }, [state.datalist, state.perPage]);
+    }, [state.datalist, state.perPage]); // eslint-disable-line react-hooks/exhaustive-deps
     
     const handlePageClick = useCallback((direction) => {
         const nextPage = direction === 'next' ? state.currentPage + 1 : state.currentPage - 1;
