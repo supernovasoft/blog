@@ -285,48 +285,52 @@ const ArticleDetail = () => {
                 `}
             </style>
             <PublicMenu />
-            <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <article className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="card">
                     <header className="px-6 py-6 border-b border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center justify-between gap-4 animate-fade-in">
-                            {/* Left side: Title, Category, Author, Date */}
-                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="animate-fade-in">
+                            {/* Title and Category - Full width on mobile */}
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white leading-tight truncate hover:text-primary-600 dark:hover:text-primary-400 transition-colors duration-300">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+                                        <h1 className="text-xl md:text-3xl font-bold text-gray-900 dark:text-white leading-tight hover:text-primary-600 dark:hover:text-primary-400 transition-colors duration-300">
                                             {data.title}
                                         </h1>
                                         {data.category && (
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 flex-shrink-0 animate-slide-in hover:scale-105 transition-transform duration-200">
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 flex-shrink-0 animate-slide-in hover:scale-105 transition-transform duration-200 self-start sm:self-center">
                                                 {data.category}
                                             </span>
                                         )}
                                     </div>
-                                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 animate-fade-in-delay">
-                                        <div className="flex items-center hover:text-gray-900 dark:hover:text-gray-200 transition-colors duration-200">
-                                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                            </svg>
-                                            <span className="font-medium">{data.author}</span>
-                                        </div>
-                                        <span className="mx-2">•</span>
-                                        <div className="flex items-center hover:text-gray-900 dark:hover:text-gray-200 transition-colors duration-200">
-                                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <DisplayTimeAgo time={data.date} isTimeAgo={true} />
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
 
-                            {/* Right side: Share Buttons */}
-                            <div className="flex items-center animate-fade-in-delay-2">
-                                <ShareButtons 
-                                    title={data.title || ''}
-                                    url={typeof window !== 'undefined' ? window.location.href : ''}
-                                    description={data.desc}
-                                />
+                            {/* Author, Date, and Share - Stack on mobile, side-by-side on desktop */}
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 animate-fade-in-delay">
+                                    <div className="flex items-center hover:text-gray-900 dark:hover:text-gray-200 transition-colors duration-200">
+                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        <span className="font-medium">{data.author}</span>
+                                    </div>
+                                    <span className="mx-2">•</span>
+                                    <div className="flex items-center hover:text-gray-900 dark:hover:text-gray-200 transition-colors duration-200">
+                                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <DisplayTimeAgo time={data.date} isTimeAgo={true} />
+                                    </div>
+                                </div>
+
+                                {/* Share Buttons - Centered on mobile, right-aligned on desktop */}
+                                <div className="flex items-center justify-center sm:justify-end animate-fade-in-delay-2">
+                                    <ShareButtons 
+                                        title={data.title || ''}
+                                        url={typeof window !== 'undefined' ? window.location.href : ''}
+                                        description={data.desc}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </header>

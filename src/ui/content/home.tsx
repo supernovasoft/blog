@@ -220,7 +220,7 @@ const Home = () => {
             
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <header className="my-8">
-                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
                         Welcome Back!
                     </h1>
                     <p className="text-lg text-gray-600 dark:text-gray-400">
@@ -228,21 +228,21 @@ const Home = () => {
                     </p>
                 </header>
 
-                <div className="flex gap-8">
+                <div className="flex flex-col lg:flex-row gap-8">
                     {/* Main Content */}
-                    <main className="flex-1">
+                    <main className="flex-1 w-full">
                         {/* Mobile Filter */}
                         {categories.length > 0 && (
                             <section className="mb-8 lg:hidden">
                                 <div className="card p-4">
-                                    <div className="flex items-center space-x-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
                                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                             Filter by category:
                                         </label>
                                         <select
                                             value={selectedCategory}
                                             onChange={(e) => handleCategoryFilter(e.target.value)}
-                                            className="input text-sm py-2 px-3"
+                                            className="input text-sm py-2 px-3 flex-1 sm:flex-initial"
                                         >
                                             <option value="">All Categories</option>
                                             {categories.map(category => (
@@ -295,13 +295,15 @@ const Home = () => {
                     </main>
 
                     {/* Sidebar - Desktop Only */}
-                    <CategorySidebar
-                        categories={categories}
-                        selectedCategory={selectedCategory}
-                        onCategoryChange={handleCategoryFilter}
-                        totalArticles={state.datalist.length}
-                        filteredCount={filteredDatalist.length}
-                    />
+                    <aside className="hidden lg:block">
+                        <CategorySidebar
+                            categories={categories}
+                            selectedCategory={selectedCategory}
+                            onCategoryChange={handleCategoryFilter}
+                            totalArticles={state.datalist.length}
+                            filteredCount={filteredDatalist.length}
+                        />
+                    </aside>
                 </div>
             </div>
         </LayoutGuest>
