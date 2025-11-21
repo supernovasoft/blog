@@ -77,7 +77,7 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
                         About This Blog
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Technology and Thoughts by Supernova Software. 
+                        Technologies and Thoughts by <a href="https://about.supernovasoft.com" target="_blank" rel="noopener noreferrer">Supernova Software</a>. 
                         Sharing insights on development, design, and innovation.
                     </p>
                 </div>
