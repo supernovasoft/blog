@@ -5,6 +5,7 @@ import hljs from 'highlight.js';
 
 import { db } from '../../../firebase';
 import { LayoutGuest, PublicMenu, fromObjectToList, DisplayTimeAgo } from '../../../layout';
+import CopyButton from '../../../components/CopyButton';
 
 const treeName = "articles";
 
@@ -25,6 +26,21 @@ let md = new Remarkable('full', {
     }
 });
 
+md.renderer.rules.fence = function (tokens, idx) {
+    const token = tokens[idx];
+    const langName = token.info ? token.info.trim() : '';
+    const highlighted = token.content;
+    
+    return `<div class="relative group">
+        <pre class="prose-pre border border-gray-300 dark:border-gray-600 rounded-lg"><code class="language-${langName}">${highlighted}</code></pre>
+        <button class="copy-button" data-code="${encodeURIComponent(token.content)}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+        </button>
+    </div>`;
+};
+
 md.renderer.rules.table_open = () => {
     return '<table class="min-w-full divide-y divide-gray-300 dark:divide-gray-700">';
 };
@@ -41,7 +57,27 @@ const ArticleDetail = () => {
                 let qref = await db.ref(treeName).orderByChild('slug').equalTo(slug);
                 const snapshot = await qref.once('value');
                 const articleList = fromObjectToList(snapshot.val());
-                setData(articleList[0] || null);
+                
+                if (articleList && articleList.length > 0) {
+                    const article = articleList[0];
+                    
+                    // Fetch category name if categoryId exists
+                    if (article.categoryId) {
+                        try {
+                            const categorySnapshot = await db.ref('categories').child(article.categoryId).once('value');
+                            const categoryData = categorySnapshot.val();
+                            if (categoryData && categoryData.name) {
+                                article.category = categoryData.name;
+                            }
+                        } catch (categoryError) {
+                            console.error('Error fetching category:', categoryError);
+                        }
+                    }
+                    
+                    setData(article);
+                } else {
+                    setData(null);
+                }
             } catch (error) {
                 console.error('Error fetching article:', error);
                 setData(null);
@@ -54,6 +90,35 @@ const ArticleDetail = () => {
             getData();
         }
     }, [slug]);
+
+    useEffect(() => {
+        // Add copy button functionality
+        const handleCopyClick = (e: Event) => {
+            const target = e.target as HTMLElement;
+            const button = target.closest('.copy-button') as HTMLButtonElement;
+            if (!button) return;
+            
+            const codeData = button.getAttribute('data-code');
+            if (!codeData) return;
+            
+            try {
+                navigator.clipboard.writeText(decodeURIComponent(codeData));
+                const originalHTML = button.innerHTML;
+                button.innerHTML = '<svg class="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                button.style.color = '#10b981';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalHTML;
+                    button.style.color = '';
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+        };
+
+        document.addEventListener('click', handleCopyClick);
+        return () => document.removeEventListener('click', handleCopyClick);
+    }, []);
     
     if (loading) {
         return (
@@ -101,26 +166,58 @@ const ArticleDetail = () => {
                     padding: 0.125rem 0.25rem;
                     border-radius: 0.25rem;
                     font-size: 0.875em;
+                    border: 1px solid #e5e7eb;
                 }
                 .dark .prose p > code {
                     background-color: #374151;
                     color: #f87171;
+                    border-color: #4b5563;
                 }
-                .prose pre {
+                .prose-pre {
                     border-radius: 0.5rem; 
                     background-color: #f3f4f6;
+                    color: #1f2937;
                     padding: 1rem;
                     overflow: auto;
                     line-height: 1.5;
                     margin: 1rem 0;
+                    border: 1px solid #d1d5db;
+                    position: relative;
                 }
-                .dark .prose pre {
+                .dark .prose-pre {
                     background-color: #1f2937;
+                    color: #f9fafb;
+                    border-color: #4b5563;
                 }
-                .prose pre code {
+                .prose-pre code {
                     background: none;
                     padding: 0;
                     color: inherit;
+                }
+                .copy-button {
+                    position: absolute;
+                    top: 0.5rem;
+                    right: 0.5rem;
+                    padding: 0.5rem;
+                    background-color: #f9fafb;
+                    border: 1px solid #d1d5db;
+                    border-radius: 0.375rem;
+                    color: #6b7280;
+                    cursor: pointer;
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                }
+                .dark .copy-button {
+                    background-color: #374151;
+                    border-color: #4b5563;
+                    color: #9ca3af;
+                }
+                .copy-button:hover {
+                    opacity: 1;
+                    color: #3b82f6;
+                }
+                .group:hover .copy-button {
+                    opacity: 1;
                 }
                 .prose table {
                     margin: 1rem 0;
@@ -149,9 +246,16 @@ const ArticleDetail = () => {
             <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="card">
                     <header className="px-6 py-6 border-b border-gray-200 dark:border-gray-700">
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
-                            {data.title}
-                        </h1>
+                        <div className="flex items-start justify-between mb-4">
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white leading-tight flex-1">
+                                {data.title}
+                            </h1>
+                            {data.category && (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 ml-4 flex-shrink-0">
+                                    {data.category}
+                                </span>
+                            )}
+                        </div>
                         <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                             <div className="flex items-center">
                                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

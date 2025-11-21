@@ -69,7 +69,7 @@ const AddDataModal = ({ getDatalistRefresh, displayName, uid }) => {
     }, []);
 
     const { open, title, desc, loading, error, success, categories, categoryId } = state;
-    const isValid = title.trim() !== '' && desc.trim() !== '';
+    const isValid = title?.trim() !== '' && desc?.trim() !== '';
     
     return (
         <>
@@ -289,7 +289,7 @@ const EditDataModal = ({ dataRow, getDatalistRefresh }) => {
     };
 
     const { title, desc, loading, error, success, open, categories, categoryId } = state;
-    const isValid = title.trim() !== '' && desc.trim() !== '';
+    const isValid = title?.trim() !== '' && desc?.trim() !== '';
     
     return (
         <>

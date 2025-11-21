@@ -4,6 +4,7 @@ import { Remarkable } from 'remarkable';
 
 import { db } from '../../firebase';
 import { LayoutGuest, PublicMenu, truncate, fromObjectToList, SimplePaginate, DisplayTimeAgo } from '../../layout';
+import CategorySidebar from '../../components/CategorySidebar';
 
 const treeName = "articles";
 let md = new Remarkable('full', {
@@ -18,6 +19,7 @@ type Article = {
     author?: string;
     desc?: string;
     date?: number;
+    category?: string;
     [key: string]: unknown;
 };
 
@@ -27,9 +29,10 @@ interface ArticleWidgetProps {
     author?: string;
     desc?: string;
     date?: number;
+    category?: string;
 }
 
-const ArticleWidget = ({ title, slug, author, desc, date }: ArticleWidgetProps) => {
+const ArticleWidget = ({ title, slug, author, desc, date, category }: ArticleWidgetProps) => {
     const navigate = useNavigate();
     
     const handleClick = () => {
@@ -42,9 +45,16 @@ const ArticleWidget = ({ title, slug, author, desc, date }: ArticleWidgetProps) 
             onClick={handleClick}
         >
             <header className="mb-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                    {title}
-                </h2>
+                <div className="flex items-start justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                        {title}
+                    </h2>
+                    {category && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 ml-3 flex-shrink-0">
+                            {category}
+                        </span>
+                    )}
+                </div>
                 <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
                     <span className="flex items-center">
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,6 +103,9 @@ interface HomeState {
     perPage: number;
     totalItemCount: number;
     datalist: Article[];
+    filteredDatalist: Article[];
+    categories: string[];
+    selectedCategory: string;
     loading: boolean;
 }
 
@@ -102,19 +115,57 @@ const Home = () => {
         perPage: 20,
         totalItemCount: 0,
         datalist: [],
+        filteredDatalist: [],
+        categories: [],
+        selectedCategory: '',
         loading: true,
     });
 
     const fetchArticles = useCallback(async () => {
         try {
             setState(prev => ({ ...prev, loading: true }));
+            
+            // Fetch articles
             const snapshot = await db.ref(treeName).once('value');
             const list = fromObjectToList(snapshot.val()) as Article[];
             const sorted = list.sort((a, b) => (b.date || 0) - (a.date || 0));
+            
+            // Fetch categories to resolve categoryId to category name
+            const categoriesSnapshot = await db.ref('categories').once('value');
+            const categories = fromObjectToList(categoriesSnapshot.val());
+            const categoryMap = categories.reduce((map: Record<string, string>, cat) => {
+                if (cat.categoryId && typeof cat.categoryId === 'string') {
+                    map[cat.categoryId] = cat.name || '';
+                }
+                return map;
+            }, {});
+            
+            // Add category name to each article
+            const articlesWithCategories = sorted.map(article => ({
+                ...article,
+                category: article.categoryId && typeof article.categoryId === 'string' 
+                    ? categoryMap[article.categoryId] || null 
+                    : null
+            }));
+            
+            console.log('Articles loaded:', articlesWithCategories);
+            console.log('Article categories:', articlesWithCategories.map(a => ({ title: a.title, category: a.category })));
+            
+            // Extract unique categories
+            const uniqueCategories = Array.from(new Set(
+                articlesWithCategories
+                    .map(article => article.category)
+                    .filter((category): category is string => Boolean(category))
+            )).sort();
+            
+            console.log('Unique categories found:', uniqueCategories);
+            
             setState(prev => ({
                 ...prev,
-                datalist: sorted,
-                totalItemCount: sorted.length,
+                datalist: articlesWithCategories,
+                filteredDatalist: articlesWithCategories,
+                categories: uniqueCategories,
+                totalItemCount: articlesWithCategories.length,
                 loading: false,
             }));
         } catch (error) {
@@ -128,10 +179,29 @@ const Home = () => {
     }, [fetchArticles]);
 
     const getDatalistPartial = useCallback((): Article[] => {
-        const { datalist, perPage, currentPage } = state;
+        const { filteredDatalist, perPage, currentPage } = state;
         const startIndex = (currentPage - 1) * perPage;
-        return datalist.slice(startIndex, startIndex + perPage);
-    }, [state.datalist, state.perPage, state.currentPage]);
+        return filteredDatalist.slice(startIndex, startIndex + perPage);
+    }, [state.filteredDatalist, state.perPage, state.currentPage]);
+
+    const handleCategoryFilter = useCallback((category: string) => {
+        console.log('Filter called with category:', category);
+        setState(prev => {
+            const filtered = category 
+                ? prev.datalist.filter(article => article.category === category)
+                : prev.datalist;
+            
+            console.log('Filter result:', filtered);
+            
+            return {
+                ...prev,
+                selectedCategory: category,
+                filteredDatalist: filtered,
+                totalItemCount: filtered.length,
+                currentPage: 1, // Reset to first page when filtering
+            };
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handlePageClick = useCallback((direction: 'next' | 'prev') => {
         setState(prev => {
@@ -142,13 +212,13 @@ const Home = () => {
         });
     }, []);
 
-    const { datalist, loading, currentPage, totalItemCount, perPage } = state;
+    const { filteredDatalist, loading, currentPage, totalItemCount, perPage, categories, selectedCategory } = state;
 
     return (
         <LayoutGuest>
             <PublicMenu />
             
-            <main className="max-w-4xl mx-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <header className="my-8">
                     <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
                         Welcome Back!
@@ -158,35 +228,82 @@ const Home = () => {
                     </p>
                 </header>
 
-                {loading ? (
-                    <div className="flex justify-center py-12">
-                        <svg className="animate-spin w-8 h-8 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </div>
-                ) : (
-                    <>
-                        <section className="space-y-6">
-                            {datalist.length > 0 ? (
-                                getDatalistPartial().map((article, index) => (
-                                    <ArticleWidget key={article.articleId || index} {...article} />
-                                ))
-                            ) : (
-                                <ArticleWidgetEmpty />
-                            )}
-                        </section>
+                <div className="flex gap-8">
+                    {/* Main Content */}
+                    <main className="flex-1">
+                        {/* Mobile Filter */}
+                        {categories.length > 0 && (
+                            <section className="mb-8 lg:hidden">
+                                <div className="card p-4">
+                                    <div className="flex items-center space-x-4">
+                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Filter by category:
+                                        </label>
+                                        <select
+                                            value={selectedCategory}
+                                            onChange={(e) => handleCategoryFilter(e.target.value)}
+                                            className="input text-sm py-2 px-3"
+                                        >
+                                            <option value="">All Categories</option>
+                                            {categories.map(category => (
+                                                <option key={category} value={category}>
+                                                    {category}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {selectedCategory && (
+                                            <button
+                                                onClick={() => handleCategoryFilter('')}
+                                                className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+                                            >
+                                                Clear filter
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </section>
+                        )}
 
-                        <footer className="mt-12">
-                            <SimplePaginate 
-                                page={currentPage}
-                                totalPages={Math.ceil(totalItemCount / perPage)}
-                                handlePageClick={handlePageClick}
-                            />
-                        </footer>
-                    </>
-                )}
-            </main>
+                        {loading ? (
+                            <div className="flex justify-center py-12">
+                                <svg className="animate-spin w-8 h-8 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
+                        ) : (
+                            <>
+                                <section className="space-y-6">
+                                    {filteredDatalist.length > 0 ? (
+                                        getDatalistPartial().map((article, index) => (
+                                            <ArticleWidget key={article.articleId || index} {...article} />
+                                        ))
+                                    ) : (
+                                        <ArticleWidgetEmpty />
+                                    )}
+                                </section>
+
+                                <footer className="mt-12">
+                                    <SimplePaginate 
+                                        page={currentPage}
+                                        totalPages={Math.ceil(totalItemCount / perPage)}
+                                        handlePageClick={handlePageClick}
+                                    />
+                                </footer>
+                            </>
+                        )}
+                    </main>
+
+                    {/* Sidebar - Desktop Only */}
+                    <CategorySidebar
+                        categories={categories}
+                        selectedCategory={selectedCategory}
+                        onCategoryChange={handleCategoryFilter}
+                        totalArticles={state.datalist.length}
+                        filteredCount={filteredDatalist.length}
+                    />
+                </div>
+            </div>
         </LayoutGuest>
     );
 };

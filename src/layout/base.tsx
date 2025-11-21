@@ -3,6 +3,7 @@ import { compose } from 'redux';
 
 import { withAuthentication, withAuthorization } from '../session';
 import Head from './head';
+import Footer from './footer';
 
 interface LayoutProps {
     title?: string;
@@ -15,6 +16,7 @@ const Layout = ({ title, children }: LayoutProps) => (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}
         </div>
+        <Footer />
     </Fragment>
 );
 
